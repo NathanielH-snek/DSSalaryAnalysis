@@ -1,0 +1,107 @@
+---
+title: "DataScienceSalaries"
+#citeproc: true
+bibliograph: DataScienceSalaries.bib
+nocite: '@*'
+format:
+  pdf:
+    toc: true
+    number-sections: true
+    colorlinks: true
+editor: visual
+---
+
+# Intro
+
+As often the people performing the analysis, data scientists are particularly interested in salaries of various data science related roles. Various attempts have been made to predict salaries using both regression and machine learning to identify the optimal locations, job titles, etc. A complexity of data science is the wide range of job titles assigned by various titles. This is in some regards inherent to data science due to its very wide range of job duties. As such assessing which job titles pay the most may result in more efficient job searches. The dataset for this analysis also includes a wide range of countries of residence and job location. Insight into disparity of salaries across countries may generate better understanding of what to consider when applying to jobs. In fact average cost of living may be a variable worth adding to this dataset in the future. The main goal of this project is to identify the most important factors into data science salary, as well as the highest paying (and least paying) roles. It is expected that experience level will be the largest factor in determining salary. It is also expected that roles that contain some form of Chief or Head will be the highest paying.
+
+# Basic Descriptives
+The data is sourced from [AIJobs](https://aijobs.net/salaries/download/). The variables in the dataset are defined as the following on the website:\
+
+* **work_year**: year salary was paid/received
+* **experience_level**:
+    + EN: Entry-level/Junior
+    + MI: Mid-level/Intermediate
+    + SE: Senior-level/Expert
+    + EX: Executive-level/Director
+* **job_title**: role
+* **salary**: gross salary
+* **salary_currency**: ISO 4217 currency code
+* **salary_in_usd**: salary in USD (FX rate divided by avg. USD rate of respective year) via statistical data from the BIS and central banks.
+* **employee_residence**: country of residence in ISO 3166 code
+* **remote_ratio**: amount of remote work
+    + 0: None (less than 20%)
+    + 50: Partially remote/hybrid
+    + 100: Fully remote (more than 80%)
+* **company_location**: country of the employer's main office or contracting branch in ISO 3166 format
+* **company_size**:
+    + S: small, less than 50 employees
+    + M: medium, 50 to 250 employees
+    + L: large, more than 250 employees
+
+
+```{r}
+rm(list=ls())
+library(ggplot2)
+library(dplyr)
+library(reshape2)
+library(glue)
+data <- read.csv("data_science_salaries.csv")
+summary(data)
+```
+
+```{r}
+#Make a basic plot of distributions for numeric values
+dataNumeric <- data[, c('work_year','salary_in_usd')]
+names(dataNumeric) <- c('work_year','salary_in_thousands')
+dataNumeric <- dataNumeric %>%
+  mutate(salary_in_thousands = salary_in_thousands / 1000)
+# creating a plot 
+barplot(table(dataNumeric$work_year), xlab = "Work Year")
+boxplot(dataNumeric$salary_in_thousands, ylab = "Salary", xlab = "Salary In Thousands", horizontal = T)
+```
+
+```{r}
+#List the unique values of the text based variables. 
+#Will probably rewrite this as a function later lots of redundant code
+head(unique(data$job_title))
+glue("{length(unique(data$job_title))} Unique Job Titles")
+
+head(unique(data$experience_level))
+glue("{length(unique(data$experience_level))} Unique Experience Levels")
+
+head(unique(data$employment_type))
+glue("{length(unique(data$employment_type))} Unique Employment Types")
+
+head(unique(data$work_models))
+glue("{length(unique(data$work_models))} Unique Work Models")
+
+head(unique(data$employee_residence))
+glue("{length(unique(data$employee_residence))} Unique Employee Residences")
+
+head(unique(data$company_size))
+glue("{length(unique(data$company_size))} Unique Company Sizes")
+
+head(unique(data$company_location))
+glue("{length(unique(data$company_location))} Unique Company Locations")
+```
+
+```{r}
+#Get salaries by role and expereince level
+data %>%
+  group_by(job_title,experience_level) %>%
+  summarize(Mean = mean(salary_in_usd)) %>%
+  arrange(desc(Mean))
+```
+
+```{r}
+#Salary by company location and size
+data %>%
+  group_by(company_location,company_size) %>%
+  summarize(Mean = mean(salary_in_usd)) %>%
+  arrange(desc(Mean))
+```
+
+# References
+
+\[1\] N. Niknejad, M. Kianiani, N. P. Puthiyapurayil, and T. A. Khan, “Analyzing Data Professional Salaries Exploring Trends and Predictive Insights,” in 2023 International Conference on Big Data, Knowledge and Control Systems Engineering (BdKCSE), Nov. 2023, pp. 1–6. doi: 10.1109/BdKCSE59280.2023.10339759. \[2\] K. S. Gill, V. Anand, R. Chauhan, S. Devliyal, and R. Gupta, “Predictive Human Resource Analytics for Classification of Salaries in the Field of Data Science,” in 2023 3rd International Conference on Smart Generation Computing, Communication and Networking (SMART GENCON), Dec. 2023, pp. 1–4. doi: 10.1109/SMARTGENCON60755.2023.10442025. \[3\] T. Z. Quan and M. Raheem, “Salary Prediction in Data Science Field Using Specialized Skills and Job Benefits – A Literature Review,” vol. 6, no. 3, 2022. \[4\] A. Kaur, D. Verma, and N. Kaur, “Utilizing Quantitative Data Science Salary Analysis to Predict Job Salaries,” in 2022 2nd International Conference on Innovative Sustainable Computational Technologies (CISCT), Dec. 2022, pp. 1–4. doi: 10.1109/CISCT55310.2022.10046491.
