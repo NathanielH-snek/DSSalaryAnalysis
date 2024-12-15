@@ -8,48 +8,65 @@ format:
     toc: true
     number-sections: true
     colorlinks: true
+include-in-header: 
+  text: |
+    \usepackage{fvextra}
+    \DefineVerbatimEnvironment{Highlighting}{Verbatim}{breaklines,commandchars=\\\{\}}
 editor: visual
 ---
 
 # Intro
 
-As often the people performing the analysis, data scientists are particularly interested in salaries of various data science related roles. Various attempts have been made to predict salaries using both regression and machine learning to identify the optimal locations, job titles, etc. A complexity of data science is the wide range of job titles assigned by various titles. This is in some regards inherent to data science due to its very wide range of job duties. As such assessing which job titles pay the most may result in more efficient job searches. The dataset for this analysis also includes a wide range of countries of residence and job location. Insight into disparity of salaries across countries may generate better understanding of what to consider when applying to jobs. In fact average cost of living may be a variable worth adding to this dataset in the future. The main goal of this project is to identify the most important factors into data science salary, as well as the highest paying (and least paying) roles. It is expected that experience level will be the largest factor in determining salary. It is also expected that roles that contain some form of Chief or Head will be the highest paying.
+As often the people performing the analysis, data scientists are particularly interested in salaries of various data science related roles. Various attempts have been made to predict salaries using both regression and machine learning to identify the optimal locations, job titles, etc. A complexity of data science is the wide range of job titles assigned by various titles. This is in some regards inherent to data science due to its very wide range of job duties. As such assessing which job titles pay the most may result in more efficient job searches. The dataset for this analysis also includes a wide range of countries of residence and job location. Insight into disparity of salaries across countries may generate better understanding of what to consider when applying to jobs. In fact average cost of living may be a variable worth adding to this dataset in the future. The most interesting part of this data is however in regards to remote employees. Naturally remote work as proliferated since 2020 due to COVID-19 [@rampasso_trends_2022]. As such and also as a future data science professional it would be interesting to understand how working remotely may affect wages, to allow for an understanding if it is worth the potential convenience. 
 
-# Basic Descriptives
-The data is sourced from [AIJobs](https://aijobs.net/salaries/download/). The variables in the dataset are defined as the following on the website:\
+# Hypothesis
+The main goal of this project is to identify the most important factors into data science salary, as well as the highest paying (and least paying) roles. It is expected that experience level will be the largest factor in determining salary. I'm interested however in how remote work effects. As such I am expecting that those working remotely will be paid more highly, as I expect that higher level roles will be able to flex leverage to work remotely and therefore will be more likely to do so. This also assumes that higher level roles will be higher compensated. 
 
-* **work_year**: year salary was paid/received
-* **experience_level**:
-    + EN: Entry-level/Junior
-    + MI: Mid-level/Intermediate
-    + SE: Senior-level/Expert
-    + EX: Executive-level/Director
-* **job_title**: role
-* **salary**: gross salary
-* **salary_currency**: ISO 4217 currency code
-* **salary_in_usd**: salary in USD (FX rate divided by avg. USD rate of respective year) via statistical data from the BIS and central banks.
-* **employee_residence**: country of residence in ISO 3166 code
-* **remote_ratio**: amount of remote work
-    + 0: None (less than 20%)
-    + 50: Partially remote/hybrid
-    + 100: Fully remote (more than 80%)
-* **company_location**: country of the employer's main office or contracting branch in ISO 3166 format
-* **company_size**:
-    + S: small, less than 50 employees
-    + M: medium, 50 to 250 employees
-    + L: large, more than 250 employees
+# Descriptive Statistics
 
+The data is sourced from [AIJobs](https://aijobs.net/salaries/download/) Accessed on Nov 27, 2024. The variables in the dataset are defined as the following on the website:\
 
+-   **work_year**: year salary was paid/received
+-   **experience_level**:
+    -   EN: Entry-level/Junior
+    -   MI: Mid-level/Intermediate
+    -   SE: Senior-level/Expert
+    -   EX: Executive-level/Director
+-   **job_title**: role
+-   **salary**: gross salary
+-   **salary_currency**: ISO 4217 currency code
+-   **salary_in_usd**: salary in USD (FX rate divided by avg. USD rate of respective year) via statistical data from the BIS and central banks.
+-   **employee_residence**: country of residence in ISO 3166 code
+-   **remote_ratio**: amount of remote work
+    -   0: None (less than 20%)
+    -   50: Partially remote/hybrid
+    -   100: Fully remote (more than 80%)
+-   **company_location**: country of the employer's main office or contracting branch in ISO 3166 format
+-   **company_size**:
+    -   S: small, less than 50 employees
+    -   M: medium, 50 to 250 employees
+    -   L: large, more than 250 employees
+
+The data itself is collected by AIJobs anonymously although it isn't explicitly listed how so.
 ```{r}
 rm(list=ls())
 library(ggplot2)
-library(dplyr)
+library(dplyr, quietly=T)
 library(reshape2)
 library(glue)
 data <- read.csv("data_science_salaries.csv")
-summary(data)
+table(data$work_year)
 ```
 
+Note that most of the data here is concentrated around 2024 which makes sense since that's when this dataset was accessed. 
+```{r}
+#Refactor remote_ratio to be a bit more logical and avoid numbers
+data$remote_ratio <- factor(data$remote_ratio, levels = c(0, 50, 100), labels = c("None", "Some", "Full"))
+#Also since we can't have time-series data I will only focus on 2024 and remove other rows since 2024 is most recent and also the most prevalent year type
+data <- data[data$work_year == 2024, ]
+summary(data)
+```
+Since remote work is of primary interest, it is important to note that there are a lot more employees that work non-remotely than do and there is a very small amount of reported salaries that fall into the only some remote work category. This brings a question mark over the results of this regression.
 ```{r}
 #Make a basic plot of distributions for numeric values
 dataNumeric <- data[, c('work_year','salary_in_usd')]
@@ -57,14 +74,22 @@ names(dataNumeric) <- c('work_year','salary_in_thousands')
 dataNumeric <- dataNumeric %>%
   mutate(salary_in_thousands = salary_in_thousands / 1000)
 # creating a plot 
-barplot(table(dataNumeric$work_year), xlab = "Work Year")
 boxplot(dataNumeric$salary_in_thousands, ylab = "Salary", xlab = "Salary In Thousands", horizontal = T)
 ```
 
 ```{r}
+#Convert the salary to salary in thousands to be more human readable and more easily interpretative
+data <- data %>%
+  mutate(salary_in_thousands = salary_in_usd / 1000)
+```
+
+```{r}
+hist(data$salary_in_thousands, xlab = 'Salary in Thousands USD', main = 'Histogram of Salary Distribution in USD Thousands')
+```
+There is quite a skew of the salaries present, which makes sense, but the data certainly doesn't appear normal. 
+
+```{r}
 #List the unique values of the text based variables. 
-#Will probably rewrite this as a function later lots of redundant code
-head(unique(data$job_title))
 glue("{length(unique(data$job_title))} Unique Job Titles")
 
 head(unique(data$experience_level))
@@ -72,9 +97,6 @@ glue("{length(unique(data$experience_level))} Unique Experience Levels")
 
 head(unique(data$employment_type))
 glue("{length(unique(data$employment_type))} Unique Employment Types")
-
-head(unique(data$work_models))
-glue("{length(unique(data$work_models))} Unique Work Models")
 
 head(unique(data$employee_residence))
 glue("{length(unique(data$employee_residence))} Unique Employee Residences")
@@ -85,9 +107,17 @@ glue("{length(unique(data$company_size))} Unique Company Sizes")
 head(unique(data$company_location))
 glue("{length(unique(data$company_location))} Unique Company Locations")
 ```
+Overall there are a lot of company positions and job titles, these may need to be condensed if they are required for control later based on the dag. 
+```{r}
+table(data$employee_residence)
+```
+Based on this table as well as well as the amount of potential and unbalanced categories, this category is going to be simplified to either "US" or "notUS." The justification for this is that A I live in the US, and B this is as close to balanced groups as can be produced (the resultant data is still extremely unbalanced).
+```{r}
+data$us_not <- ifelse(data$employee_residence == "US", "US", "Other") 
+```
 
 ```{r}
-#Get salaries by role and expereince level
+#Get salaries by role and experience level
 data %>%
   group_by(job_title,experience_level) %>%
   summarize(Mean = mean(salary_in_usd)) %>%
@@ -101,7 +131,102 @@ data %>%
   summarize(Mean = mean(salary_in_usd)) %>%
   arrange(desc(Mean))
 ```
+These results are interesting albeit not relevant to the hypothesis but interesting. China is not particularly surprising to be above the US in salary but Venezuela is a surprising one. That could be interesting to dig into, as it could be a result of small samples or perhaps remote workers. 
+
+
+
+
+```{r}
+#Make a violin plot of salaries by experience level
+ggplot(data, aes(
+  x = factor(experience_level, level=c("EN","MI","SE","EX"), labels=c("Entry","MidLevel","Senior","Executive")),
+  y = salary_in_thousands, fill = experience_level
+  )) +
+  geom_violin() + 
+  labs(
+    title = "Salary Distribution by Experience Level",
+    x = "Experience Level",
+    y = "Salary in Thousands USD"
+  )
+```
+It is interesting that the highest paid employee belongs to a mid level position, generally though it does look like distributions of salaries increase based on higher level positions for roles. 
+```{r}
+library(GGally)
+plotdat <- subset(data, select = c(experience_level,salary_in_thousands,remote_ratio,us_not,company_size))
+ggpairs(plotdat)
+```
+This plot essentially encompasses all of the data in one chart. It is really important to notice just how unbalanced most of the data is overall. This potentially makes for a somewhat innacurate regression if it were to be used for prediction. Every single variable is heavily unbalanced or skewed in some way. 
+
+# Model Fitting / Hypothesis Testing
+The following dag is comprised of many logical assumptions. Every variable included should affect salary in some way or another. I would expect more experience, working more hours (being full-time), working remotely, to increase your salary. What your job title is (analyst vs. engineer vs. scientist) should certainly affect salary as they are distinctly different positions with different role expectations. The place of residence should affect salary depending on whether that country is a hub for tech or not. A larger company will likely pay more, and a company in a place that isn't a tech hub will likely pay less. Higher-level workers would generally be expected to be full-time since those roles are inherently more demanding and important to the function of a company. They also are expected to hold higher-level jobs, so that will affect their job title. As stated in the hypothesis, it also seems likely that higher-level employees will be more able to leverage their power to work more remotely. If a non-employee doesn't work in the US since the US is a central point of tech (and also the dominant from this dataset), then it seems likely they will be working remotely. It also makes sense that where one lives would affect where one works.
+```{r}
+library(dagitty)
+
+dag <- dagitty('
+  dag {
+    experience_level -> salary
+    experience_level -> employment_type
+    experience_level -> job_title
+    experience_level -> remote_ratio
+    employment_type -> salary
+    employment_type -> job_title
+    employment_type -> remote_ratio
+    job_title -> salary
+    employee_residence -> salary
+    employee_residence -> remote_ratio
+    employee_residence -> company_location
+    remote_ratio -> salary
+    company_location -> salary
+    company_size -> salary
+  }
+')
+
+dag |> graphLayout() |> plot()
+
+dag |> adjustmentSets(exposure = "remote_ratio", outcome = "salary")
+```
+Based on the DAG the variables that need to be controlled for are employee residence, employment type and experience level. A reminder that employee residence is actually now us_not (whether the residence is the us or not) due to a large number of categories. 
+```{r}
+#US_not here is an alias to employee_residence since I've converted that to be more usable and prevent over fitting
+mod <- lm(salary_in_thousands ~ remote_ratio + us_not + employment_type + experience_level, data=data)
+summary(mod)
+```
+
+```{r}
+conf <- confint(mod)
+printconf <- conf[grep("remote_ratio",rownames(conf)), ]
+printconf
+```
+Both 95% confidence intervals indicate that working remotely in any capacity results in less pay. Workers who work partially remotely result in anywhere from a ~44,000 USD to ~4,000 USD less salary versus those who don't work remotely. In comparison workers who are fully remote can receive anywhere from ~17,000 USD to ~14,000 USD less money in comparison to those working fully in person. This is in direct opposition to the proposed hypothesis. Notably the confidence interval regarding some remote work is quite broad, which can likely be attributed to the miniscule amount of data for that category. Also remembering that these values are in thousands of dollars, working remotely appears to have significant negative effects on salary both statistically and substantively. This in conjunction with an expected lower amount of inherent networking may make working remotely unwise. Further analysis including a cost-savings analysis which would need to include implicit costs would be needed to draw any general conclusions however.  
+
+# Diagnostics
+
+```{r}
+plot(mod, which = 1:6)
+```
+First, the residuals vs fitted plots indicate a slightly unusual variance. The data certainly has some outliers and seems to trend towards the higher side of the residuals, even if the line of best fit doesn't denote that explicitly. Overall, this is not the most egregious violation of this model. The scale-location plot also shows a similar story as well. The Q-Q plot is a different story; however, the data is certainly not normal. This makes sense from the descriptives as well; perhaps a log model would be more apt in this situation. Cook's distance reveals that there are a few major outlier data points, and they technically violate the size of 4/n, which is 7.293414e-05. In fact, many observations do. This is something to bear in mind regarding the model. Looking at the residuals vs leverage, it seems that none of the influential observations are too influential to violate the assumption; in fact, the line of best fit here is quite flat. Certainly, it would be wise to try another model on this data to see if it is described better.
+
+To support that another model would likely be wise the r squared value is 0.1461 with an adjusted r squared of 0.1459 which is particularly low. Without making numerous models a log-linear model is a logical comparison. Since the salaries distribution itself looks logarithmic this seems like a reasonable model to try. 
+
+```{r}
+modlog <- lm(log(salary_in_thousands) ~ remote_ratio + us_not + employment_type + experience_level, data=data)
+summary(modlog)
+```
+
+```{r}
+conf <- confint(modlog)
+printconflog <- conf[grep("remote_ratio",rownames(conf)), ]
+exp(printconflog)
+```
+
+Although we are now interpreting in percentage changes to due to a log-linear model, any amount of remote work still decreases salary (a ~35% to ~17% decrease for some vs no remote work) and (a ~10% to ~8% for fully remote vs no remote). Additionally our r squared value is now 0.2215,	and the adjusted r squared is 0.2214. This is a clearly better model based on this metric as we've increased the r squared value indicating a better "fit" or description of salary variance. 
+
+```{r}
+plot(modlog, which = 1:6)
+```
+
+Additionally looking at the assessment plots although most of the plots are similar in terms of their visualization and interpretation one notably outlier is the Q-Q plot which seems to fit the data a little bit better than the linear model. There are still some oddities on both ends however, so there's still some room for potential improvement. 
 
 # References
 
-\[1\] N. Niknejad, M. Kianiani, N. P. Puthiyapurayil, and T. A. Khan, “Analyzing Data Professional Salaries Exploring Trends and Predictive Insights,” in 2023 International Conference on Big Data, Knowledge and Control Systems Engineering (BdKCSE), Nov. 2023, pp. 1–6. doi: 10.1109/BdKCSE59280.2023.10339759. \[2\] K. S. Gill, V. Anand, R. Chauhan, S. Devliyal, and R. Gupta, “Predictive Human Resource Analytics for Classification of Salaries in the Field of Data Science,” in 2023 3rd International Conference on Smart Generation Computing, Communication and Networking (SMART GENCON), Dec. 2023, pp. 1–4. doi: 10.1109/SMARTGENCON60755.2023.10442025. \[3\] T. Z. Quan and M. Raheem, “Salary Prediction in Data Science Field Using Specialized Skills and Job Benefits – A Literature Review,” vol. 6, no. 3, 2022. \[4\] A. Kaur, D. Verma, and N. Kaur, “Utilizing Quantitative Data Science Salary Analysis to Predict Job Salaries,” in 2022 2nd International Conference on Innovative Sustainable Computational Technologies (CISCT), Dec. 2022, pp. 1–4. doi: 10.1109/CISCT55310.2022.10046491.
+\[1\] N. Niknejad, M. Kianiani, N. P. Puthiyapurayil, and T. A. Khan, “Analyzing Data Professional Salaries Exploring Trends and Predictive Insights,” in 2023 International Conference on Big Data, Knowledge and Control Systems Engineering (BdKCSE), Nov. 2023, pp. 1–6. doi: 10.1109/BdKCSE59280.2023.10339759. \[2\] K. S. Gill, V. Anand, R. Chauhan, S. Devliyal, and R. Gupta, “Predictive Human Resource Analytics for Classification of Salaries in the Field of Data Science,” in 2023 3rd International Conference on Smart Generation Computing, Communication and Networking (SMART GENCON), Dec. 2023, pp. 1–4. doi: 10.1109/SMARTGENCON60755.2023.10442025. \[3\] T. Z. Quan and M. Raheem, “Salary Prediction in Data Science Field Using Specialized Skills and Job Benefits – A Literature Review,” vol. 6, no. 3, 2022. \[4\] I. S. Rampasso et al., “Trends in remote work: A science mapping study,” WORK, vol. 71, no. 2, pp. 441–450, Jan. 2022, doi: 10.3233/WOR-210912. \[5\] A. Kaur, D. Verma, and N. Kaur, “Utilizing Quantitative Data Science Salary Analysis to Predict Job Salaries,” in 2022 2nd International Conference on Innovative Sustainable Computational Technologies (CISCT), Dec. 2022, pp. 1–4. doi: 10.1109/CISCT55310.2022.10046491.
